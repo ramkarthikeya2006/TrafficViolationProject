@@ -1,0 +1,297 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard | Traffic-Vigil AI{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <!-- Header Hero Banner -->
+    <div class="dashboard-hero">
+        <div class="hero-content">
+            <h1>Traffic Monitoring & Violation Control Center</h1>
+            <p>Automated computer vision surveillance, vehicle tracking, plate extraction, and human-in-the-loop violation auditing.</p>
+        </div>
+        <div class="hero-actions">
+            <a href="{{ url_for('upload_video') }}" class="btn btn-primary btn-lg">
+                <i class="fa-solid fa-cloud-arrow-up"></i> Upload New Traffic Video
+            </a>
+            <a href="{{ url_for('records_view') }}" class="btn btn-secondary btn-lg">
+                <i class="fa-solid fa-list-check"></i> Review Violations
+            </a>
+        </div>
+    </div>
+
+    <!-- KPI Metric Summary Cards -->
+    <div class="metrics-grid">
+        <div class="metric-card">
+            <div class="metric-icon bg-blue-subtle text-blue">
+                <i class="fa-solid fa-car-side"></i>
+            </div>
+            <div class="metric-data">
+                <span class="metric-label">Total Detections</span>
+                <h2 class="metric-value">{{ stats.total_detections }}</h2>
+                <span class="metric-subtext">Vehicles & monitored frames</span>
+            </div>
+        </div>
+
+        <div class="metric-card">
+            <div class="metric-icon bg-danger-subtle text-danger">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <div class="metric-data">
+                <span class="metric-label">Suspected Violations</span>
+                <h2 class="metric-value">{{ stats.suspected_violations }}</h2>
+                <span class="metric-subtext">Safety infractions flagged</span>
+            </div>
+        </div>
+
+        <div class="metric-card">
+            <div class="metric-icon bg-amber-subtle text-amber">
+                <i class="fa-solid fa-user-clock"></i>
+            </div>
+            <div class="metric-data">
+                <span class="metric-label">Pending Reviews</span>
+                <h2 class="metric-value">{{ stats.pending_reviews }}</h2>
+                <span class="metric-subtext">Awaiting human sign-off</span>
+            </div>
+        </div>
+
+        <div class="metric-card">
+            <div class="metric-icon bg-emerald-subtle text-emerald">
+                <i class="fa-solid fa-film"></i>
+            </div>
+            <div class="metric-data">
+                <span class="metric-label">Audited Videos</span>
+                <h2 class="metric-value">{{ stats.total_videos }}</h2>
+                <span class="metric-subtext">Uploaded video feeds</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Computer Vision Engine Status -->
+    <div class="section-card">
+        <div class="section-header">
+            <div class="section-title-wrap">
+                <i class="fa-solid fa-microchip text-blue"></i>
+                <h2>Computer Vision & Deep Learning Subsystems</h2>
+            </div>
+            <span class="badge badge-subtle">Real-Time Model Health</span>
+        </div>
+        
+        <div class="models-grid">
+            <!-- Vehicle Detection Model -->
+            <div class="model-status-card">
+                <div class="model-header">
+                    <div class="model-icon">
+                        <i class="fa-solid fa-truck-monster"></i>
+                    </div>
+                    <div class="model-title-group">
+                        <h3>Vehicle Detector</h3>
+                        <span class="model-tech">{{ model_status.vehicle_model.name }}</span>
+                    </div>
+                    {% if model_status.vehicle_model.available %}
+                        <span class="status-pill status-pill-success">Operational</span>
+                    {% else %}
+                        <span class="status-pill status-pill-danger">Missing</span>
+                    {% endif %}
+                </div>
+                <p class="model-desc">
+                    Pretrained COCO deep network detecting cars, motorcycles, buses, and heavy trucks with high precision.
+                </p>
+                <div class="model-footer">
+                    <span class="badge-tag">Weights: {{ model_status.vehicle_model.file }}</span>
+                    <span class="badge-tag">Classes: 4 vehicle types</span>
+                </div>
+            </div>
+
+            <!-- Helmet Detection Model -->
+            <div class="model-status-card">
+                <div class="model-header">
+                    <div class="model-icon">
+                        <i class="fa-solid fa-helmet-safety"></i>
+                    </div>
+                    <div class="model-title-group">
+                        <h3>Helmet Classifier</h3>
+                        <span class="model-tech">{{ model_status.helmet_model.name }}</span>
+                    </div>
+                    {% if model_status.helmet_model.available %}
+                        <span class="status-pill status-pill-success">Operational</span>
+                    {% else %}
+                        <span class="status-pill status-pill-warning">Not Installed</span>
+                    {% endif %}
+                </div>
+                <p class="model-desc">
+                    {{ model_status.helmet_model.message }}
+                </p>
+                <div class="model-footer">
+                    <span class="badge-tag">Weights: {{ model_status.helmet_model.file }}</span>
+                    <span class="badge-tag">Status: {{ model_status.helmet_model.status }}</span>
+                </div>
+            </div>
+
+            <!-- Plate Detection & OCR Engine -->
+            <div class="model-status-card">
+                <div class="model-header">
+                    <div class="model-icon">
+                        <i class="fa-solid fa-id-card"></i>
+                    </div>
+                    <div class="model-title-group">
+                        <h3>Number Plate & OCR</h3>
+                        <span class="model-tech">{{ model_status.plate_model.ocr_engine }}</span>
+                    </div>
+                    {% if model_status.plate_model.available %}
+                        <span class="status-pill status-pill-success">Dedicated YOLO</span>
+                    {% else %}
+                        <span class="status-pill status-pill-info">Morphology ROI + OCR</span>
+                    {% endif %}
+                </div>
+                <p class="model-desc">
+                    {{ model_status.plate_model.message }}
+                </p>
+                <div class="model-footer">
+                    <span class="badge-tag">OCR: {{ 'Active' if model_status.plate_model.ocr_available else 'Inactive' }}</span>
+                    <span class="badge-tag">Mode: {{ model_status.plate_model.status }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Analytics Charts Section -->
+    <div class="charts-row">
+        <div class="chart-container-card">
+            <div class="card-header-clean">
+                <h3><i class="fa-solid fa-chart-pie text-blue"></i> Vehicle Distribution</h3>
+                <span class="text-xs text-muted">Detected across traffic feeds</span>
+            </div>
+            <div class="chart-wrapper">
+                <canvas id="vehicleDistributionChart"></canvas>
+            </div>
+        </div>
+
+        <div class="chart-container-card">
+            <div class="card-header-clean">
+                <h3><i class="fa-solid fa-chart-column text-blue"></i> Traffic Events & Violations</h3>
+                <span class="text-xs text-muted">Categorized event frequency</span>
+            </div>
+            <div class="chart-wrapper">
+                <canvas id="eventDistributionChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Detections & Evidence Table -->
+    <div class="section-card">
+        <div class="section-header">
+            <div class="section-title-wrap">
+                <i class="fa-solid fa-clock-rotate-left text-blue"></i>
+                <h2>Recent Detection Records</h2>
+            </div>
+            <a href="{{ url_for('records_view') }}" class="btn btn-sm btn-outline">
+                View All Records <i class="fa-solid fa-arrow-right"></i>
+            </a>
+        </div>
+
+        {% if stats.recent_records %}
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Evidence Preview</th>
+                            <th>Video Source</th>
+                            <th>Timestamp</th>
+                            <th>Vehicle</th>
+                            <th>Extracted Plate</th>
+                            <th>Event Type</th>
+                            <th>Confidence</th>
+                            <th>Review Status</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for r in stats.recent_records %}
+                            <tr>
+                                <td>
+                                    <div class="evidence-thumb-wrap" onclick="openEvidenceModal(
+                                        '{{ url_for('static', filename='evidence/' + r.evidence_image) }}',
+                                        'Record #{{ r.id }} - {{ r.event_type }}',
+                                        '{{ r.formatted_time }}',
+                                        '{{ r.event_type }}',
+                                        '{{ r.vehicle_type }}',
+                                        '{{ r.plate_text }}',
+                                        '{{ (r.confidence * 100) | round(1) }}%',
+                                        '{{ r.review_status }}',
+                                        '{{ r.reviewer_notes | default('No notes', true) }}'
+                                    )">
+                                        <img src="{{ url_for('static', filename='evidence/' + r.evidence_image) }}" 
+                                             alt="Evidence thumbnail" 
+                                             class="evidence-thumb"
+                                             onerror="this.src='https://placehold.co/120x80?text=Preview';">
+                                        <div class="thumb-overlay">
+                                            <i class="fa-solid fa-magnifying-glass-plus"></i>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="font-medium text-slate-800">{{ r.video_name }}</span>
+                                </td>
+                                <td>
+                                    <span class="font-mono badge-time">{{ r.formatted_time }}</span>
+                                </td>
+                                <td>
+                                    <span class="vehicle-badge vehicle-{{ r.vehicle_type }}">
+                                        {{ r.vehicle_type | capitalize }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="plate-badge">{{ r.plate_text }}</span>
+                                </td>
+                                <td>
+                                    <span class="event-tag {% if 'Violation' in r.event_type or 'No Helmet' in r.event_type %}event-violation{% else %}event-normal{% endif %}">
+                                        {{ r.event_type }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="conf-pill">{{ (r.confidence * 100) | round(1) }}%</span>
+                                </td>
+                                <td>
+                                    <span class="review-status-pill status-{{ r.review_status | lower | replace(' ', '-') | replace('/', '-') }}">
+                                        {{ r.review_status }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <button class="btn btn-xs btn-outline" 
+                                            onclick="openReviewModal('{{ r.id }}', '{{ r.review_status }}', '{{ r.reviewer_notes | escape }}')">
+                                        <i class="fa-solid fa-user-pen"></i> Review
+                                    </button>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="empty-state">
+                <i class="fa-solid fa-video-slash empty-icon"></i>
+                <h3>No Traffic Detections Logged Yet</h3>
+                <p>Upload a traffic video file to begin automated vehicle monitoring and violation analysis.</p>
+                <a href="{{ url_for('upload_video') }}" class="btn btn-primary mt-3">
+                    <i class="fa-solid fa-cloud-arrow-up"></i> Upload First Video
+                </a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // Fetch dashboard statistics and render Chart.js analytics
+        fetch('/api/stats')
+            .then(res => res.json())
+            .then(data => {
+                renderDashboardCharts(data);
+            })
+            .catch(err => console.error("Could not load stats for charts:", err));
+    });
+</script>
+{% endblock %}

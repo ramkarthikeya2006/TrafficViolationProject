@@ -1,0 +1,4 @@
+# Directory for YOLO weight files:
+# - yolov8n.pt (genuine vehicle detector)
+# - helmet_model.pt (optional custom helmet detection weights)
+# - plate_model.pt (optional custom license plate detection weights)

@@ -1,0 +1,197 @@
+{% extends 'base.html' %}
+
+{% block title %}Processing Video | Traffic-Vigil AI{% endblock %}
+
+{% block content %}
+<div class="process-page-container">
+    <div class="process-header">
+        <div class="header-left">
+            <span class="badge badge-info"><i class="fa-solid fa-microchip"></i> Live AI Engine</span>
+            <h1>Video Analysis & Traffic Auditing</h1>
+            <p class="text-muted text-sm">Processing source: <strong>{{ video.original_name }}</strong></p>
+        </div>
+        <div class="header-right">
+            <a href="{{ url_for('dashboard') }}" class="btn btn-outline btn-sm">
+                <i class="fa-solid fa-house"></i> Dashboard
+            </a>
+        </div>
+    </div>
+
+    <!-- Telemetry Cards -->
+    <div class="telemetry-grid">
+        <div class="telemetry-card">
+            <span class="telemetry-label">Analysis Progress</span>
+            <div class="telemetry-value" id="percentDisplay">0%</div>
+            <span class="telemetry-sub" id="statusMessage">Connecting to AI stream...</span>
+        </div>
+        <div class="telemetry-card">
+            <span class="telemetry-label">Frames Processed</span>
+            <div class="telemetry-value" id="framesDisplay">0 / -</div>
+            <span class="telemetry-sub">Analyzed surveillance frames</span>
+        </div>
+        <div class="telemetry-card">
+            <span class="telemetry-label">Processing Speed</span>
+            <div class="telemetry-value" id="fpsDisplay">0.0 FPS</div>
+            <span class="telemetry-sub">Real-time throughput</span>
+        </div>
+        <div class="telemetry-card">
+            <span class="telemetry-label">Events & Violations Found</span>
+            <div class="telemetry-value text-danger" id="violationsDisplay">0</div>
+            <span class="telemetry-sub">Flagged evidence captures</span>
+        </div>
+    </div>
+
+    <!-- Main Live Progress Panel -->
+    <div class="process-panel-card">
+        <div class="progress-section">
+            <div class="progress-bar-container-lg">
+                <div class="progress-bar-fill progress-bar-animated" id="liveProgressBar" style="width: 0%;"></div>
+            </div>
+            <div class="progress-meta-row">
+                <span id="liveStatusText"><i class="fa-solid fa-circle-notch fa-spin text-blue"></i> Initializing detection models...</span>
+                <span id="livePercentLabel" class="font-bold">0%</span>
+            </div>
+        </div>
+
+        <!-- Completion Call to Action (hidden initially) -->
+        <div id="completionBanner" class="completion-banner" style="display: none;">
+            <div class="completion-icon">
+                <i class="fa-solid fa-circle-check text-emerald"></i>
+            </div>
+            <div class="completion-text">
+                <h3>Video Analysis Complete!</h3>
+                <p id="completionSummary">All frames processed and evidence records captured.</p>
+            </div>
+            <div class="completion-action">
+                <a href="{{ url_for('records_view', video_id=video.id) }}" class="btn btn-primary btn-lg">
+                    <i class="fa-solid fa-images"></i> View Filterable Records & Evidence
+                </a>
+            </div>
+        </div>
+
+        <!-- Failure Banner (hidden initially) -->
+        <div id="errorBanner" class="error-banner" style="display: none;">
+            <div class="error-icon">
+                <i class="fa-solid fa-triangle-exclamation text-danger"></i>
+            </div>
+            <div class="error-text">
+                <h3>Processing Error Encountered</h3>
+                <p id="errorMessageText">An issue occurred while decoding or processing the video.</p>
+            </div>
+            <div class="error-action">
+                <a href="{{ url_for('upload_video') }}" class="btn btn-outline-danger">
+                    <i class="fa-solid fa-arrow-rotate-left"></i> Re-upload Video
+                </a>
+            </div>
+        </div>
+
+        <!-- Real-Time Activity Log Feed -->
+        <div class="activity-feed-section">
+            <div class="feed-header">
+                <h3><i class="fa-solid fa-terminal text-blue"></i> Real-Time Detection Logs</h3>
+                <span class="text-xs text-muted">Telemetry events generated during inference</span>
+            </div>
+            <div class="feed-console" id="feedConsole">
+                <div class="log-line log-info">[INFO] Initialized video capture for '{{ video.original_name }}'</div>
+                <div class="log-line log-info">[INFO] Loading YOLOv8 object detector into memory...</div>
+                <div class="log-line log-info">[INFO] EasyOCR recognition module online.</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const videoId = {{ video.id }};
+    const pBar = document.getElementById('liveProgressBar');
+    const percentDisplay = document.getElementById('percentDisplay');
+    const livePercentLabel = document.getElementById('livePercentLabel');
+    const framesDisplay = document.getElementById('framesDisplay');
+    const fpsDisplay = document.getElementById('fpsDisplay');
+    const violationsDisplay = document.getElementById('violationsDisplay');
+    const liveStatusText = document.getElementById('liveStatusText');
+    const statusMessage = document.getElementById('statusMessage');
+    const feedConsole = document.getElementById('feedConsole');
+    const completionBanner = document.getElementById('completionBanner');
+    const completionSummary = document.getElementById('completionSummary');
+    const errorBanner = document.getElementById('errorBanner');
+    const errorMessageText = document.getElementById('errorMessageText');
+
+    function appendLog(text, type = 'info') {
+        const line = document.createElement('div');
+        line.className = `log-line log-${type}`;
+        const time = new Date().toLocaleTimeString();
+        line.textContent = `[${time}] ${text}`;
+        feedConsole.appendChild(line);
+        feedConsole.scrollTop = feedConsole.scrollHeight;
+    }
+
+    // Connect to Server-Sent Events stream
+    const eventSource = new EventSource(`/stream_process/${videoId}`);
+
+    eventSource.onmessage = function (event) {
+        try {
+            const data = JSON.parse(event.data);
+
+            if (data.error) {
+                eventSource.close();
+                pBar.style.width = '100%';
+                pBar.classList.remove('progress-bar-animated');
+                pBar.style.backgroundColor = '#ef4444';
+                liveStatusText.innerHTML = `<span class="text-danger"><i class="fa-solid fa-triangle-exclamation"></i> Error: ${data.error}</span>`;
+                errorMessageText.textContent = data.error;
+                errorBanner.style.display = 'flex';
+                appendLog(`ERROR: ${data.error}`, 'error');
+                return;
+            }
+
+            const pct = data.percent || 0;
+            pBar.style.width = pct + '%';
+            percentDisplay.textContent = pct + '%';
+            livePercentLabel.textContent = pct + '%';
+            
+            if (data.current_frame !== undefined) {
+                framesDisplay.textContent = `${data.current_frame} / ${data.total_frames || '?'}`;
+            }
+            if (data.fps !== undefined) {
+                fpsDisplay.textContent = `${data.fps} FPS`;
+            }
+            if (data.violations !== undefined) {
+                violationsDisplay.textContent = data.violations;
+            }
+            if (data.message) {
+                liveStatusText.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin text-blue"></i> ${data.message}`;
+                statusMessage.textContent = data.message;
+            }
+
+            // Periodic telemetry log
+            if (data.current_frame && data.current_frame % 30 === 0) {
+                appendLog(`Processed frame ${data.current_frame}/${data.total_frames} (${pct}%) @ ${data.fps} FPS - ${data.violations} detections.`);
+            }
+
+            if (data.done) {
+                eventSource.close();
+                pBar.style.width = '100%';
+                pBar.classList.remove('progress-bar-animated');
+                pBar.style.backgroundColor = '#10b981';
+                percentDisplay.textContent = '100%';
+                livePercentLabel.textContent = '100%';
+                liveStatusText.innerHTML = `<span class="text-emerald font-bold"><i class="fa-solid fa-circle-check"></i> Completed</span>`;
+                statusMessage.textContent = 'Inference complete.';
+                
+                completionSummary.textContent = `Completed analysis of ${data.total_frames} frames. Captured ${data.violations} evidence records.`;
+                completionBanner.style.display = 'flex';
+                appendLog(`SUCCESS: Video processing complete. Total detections: ${data.violations}`, 'success');
+            }
+        } catch (e) {
+            console.error("Error parsing SSE data:", e);
+        }
+    };
+
+    eventSource.onerror = function (err) {
+        console.warn("EventSource encountered an error or stream completed.", err);
+        eventSource.close();
+    };
+</script>
+{% endblock %}

@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}AI Traffic Violation Monitoring System{% endblock %}</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <!-- Top Header Navigation -->
+    <header class="app-header">
+        <div class="header-container">
+            <div class="brand-section">
+                <div class="brand-logo">
+                    <i class="fa-solid fa-shield-halved"></i>
+                </div>
+                <div class="brand-text">
+                    <span class="brand-title">TRAFFIC-VIGIL AI</span>
+                    <span class="brand-subtitle">Intelligent Violation Detection & Auditing System</span>
+                </div>
+            </div>
+
+            <nav class="nav-links">
+                <a href="{{ url_for('dashboard') }}" class="nav-item {% if request.endpoint == 'dashboard' %}active{% endif %}">
+                    <i class="fa-solid fa-chart-pie"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="{{ url_for('upload_video') }}" class="nav-item {% if request.endpoint == 'upload_video' %}active{% endif %}">
+                    <i class="fa-solid fa-cloud-arrow-up"></i>
+                    <span>Upload Video</span>
+                </a>
+                <a href="{{ url_for('records_view') }}" class="nav-item {% if request.endpoint == 'records_view' %}active{% endif %}">
+                    <i class="fa-solid fa-clipboard-list"></i>
+                    <span>Audit Records</span>
+                </a>
+                <a href="{{ url_for('videos_view') }}" class="nav-item {% if request.endpoint == 'videos_view' %}active{% endif %}">
+                    <i class="fa-solid fa-film"></i>
+                    <span>Videos</span>
+                </a>
+                <a href="{{ url_for('export_csv') }}" class="btn btn-sm btn-outline-light nav-action">
+                    <i class="fa-solid fa-file-export"></i>
+                    <span>Export CSV</span>
+                </a>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Notification Toast / Flash Alerts -->
+    <div class="flash-container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">
+                        <div class="alert-icon">
+                            {% if category == 'error' %}
+                                <i class="fa-solid fa-triangle-exclamation"></i>
+                            {% elif category == 'success' %}
+                                <i class="fa-solid fa-circle-check"></i>
+                            {% else %}
+                                <i class="fa-solid fa-circle-info"></i>
+                            {% endif %}
+                        </div>
+                        <div class="alert-message">{{ message }}</div>
+                        <button type="button" class="alert-close" onclick="this.parentElement.remove();">&times;</button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <!-- Main Content Area -->
+    <main class="main-wrapper">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Global Evidence Modal -->
+    <div id="evidenceModal" class="modal">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <div class="modal-title-group">
+                    <h3 class="modal-title" id="modalTitle">Evidence Inspection</h3>
+                    <span class="modal-meta" id="modalMeta">Timestamp & Plate Data</span>
+                </div>
+                <button type="button" class="modal-close" onclick="closeEvidenceModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="modal-image-container">
+                    <img id="modalEvidenceImage" src="" alt="Violation Evidence" class="modal-evidence-img">
+                </div>
+                <div class="modal-details-grid">
+                    <div class="detail-item">
+                        <span class="detail-label">Event:</span>
+                        <span class="detail-value" id="modalEvent">-</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Vehicle Type:</span>
+                        <span class="detail-value" id="modalVehicle">-</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">License Plate:</span>
+                        <span class="detail-value font-mono" id="modalPlate">-</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Detection Confidence:</span>
+                        <span class="detail-value" id="modalConfidence">-</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Review Status:</span>
+                        <span class="detail-value" id="modalStatusBadge">-</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Notes:</span>
+                        <span class="detail-value" id="modalNotes">-</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <a id="modalDownloadBtn" href="" download class="btn btn-outline">
+                    <i class="fa-solid fa-download"></i> Save Image
+                </a>
+                <button type="button" class="btn btn-primary" onclick="closeEvidenceModal()">Done</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Human Review Modal -->
+    <div id="reviewModal" class="modal">
+        <div class="modal-dialog modal-dialog-sm">
+            <div class="modal-header">
+                <h3 class="modal-title">Human Verification Decision</h3>
+                <button type="button" class="modal-close" onclick="closeReviewModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted text-sm mb-3">
+                    Confirm or update the violation review status for record #<strong id="reviewRecordId"></strong>.
+                </p>
+                <form id="reviewForm" onsubmit="submitReview(event)">
+                    <input type="hidden" id="reviewViolationId" name="violation_id">
+                    
+                    <div class="form-group mb-3">
+                        <label class="form-label">Review Decision</label>
+                        <select id="reviewStatusSelect" class="form-control" required>
+                            <option value="Approved Violation">Approve as Violation</option>
+                            <option value="Dismissed / False Positive">Dismiss (False Positive / Normal Traffic)</option>
+                            <option value="Pending Review">Keep as Pending Review</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group mb-3">
+                        <label class="form-label">Reviewer Notes (Optional)</label>
+                        <textarea id="reviewNotesInput" class="form-control" rows="2" placeholder="e.g., Confirmed helmet absent on pillion, clear daylight visibility..."></textarea>
+                    </div>
+
+                    <div class="modal-footer px-0 pb-0">
+                        <button type="button" class="btn btn-outline" onclick="closeReviewModal()">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save Decision</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+        <div class="footer-container">
+            <p>&copy; 2026 AI Intelligent Traffic Violation Detection & Monitoring System &bull; B.Tech Capstone Project</p>
+            <p class="footer-tech">Engineered with Python Flask, Ultralytics YOLOv8, OpenCV & EasyOCR</p>
+        </div>
+    </footer>
+
+    <!-- Core JavaScript -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+
+{% block title %}Page Not Found | Traffic-Vigil AI{% endblock %}
+
+{% block content %}
+<div class="empty-state py-5">
+    <i class="fa-solid fa-triangle-exclamation empty-icon text-amber"></i>
+    <h1>404 - Page Not Found</h1>
+    <p>The requested page or record does not exist on this traffic surveillance server.</p>
+    <a href="{{ url_for('dashboard') }}" class="btn btn-primary mt-3">
+        <i class="fa-solid fa-house"></i> Return to Dashboard
+    </a>
+</div>
+{% endblock %}

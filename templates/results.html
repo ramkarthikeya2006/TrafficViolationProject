@@ -1,0 +1,237 @@
+{% extends 'base.html' %}
+
+{% block title %}Violation Records & Evidence | Traffic-Vigil AI{% endblock %}
+
+{% block content %}
+<div class="records-page-container">
+    <div class="page-header">
+        <div class="page-title-wrap">
+            <h1>Traffic Violation Audit Records</h1>
+            <p>Search, filter, and inspect computer vision evidence captures with human-in-the-loop review.</p>
+        </div>
+        <div class="header-actions">
+            <a href="{{ url_for('export_csv') }}" class="btn btn-outline">
+                <i class="fa-solid fa-file-csv"></i> Download CSV Report
+            </a>
+            <a href="{{ url_for('upload_video') }}" class="btn btn-primary">
+                <i class="fa-solid fa-cloud-arrow-up"></i> Upload Another Video
+            </a>
+        </div>
+    </div>
+
+    <!-- Filter & Search Toolbar -->
+    <div class="filter-card">
+        <form method="GET" action="{{ url_for('records_view') }}" class="filter-form">
+            <div class="filter-row">
+                <!-- Search text -->
+                <div class="filter-group search-group">
+                    <label class="filter-label">Search Query</label>
+                    <div class="input-icon-wrap">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        <input type="text" name="search" class="form-control" placeholder="Search plate number, video..." value="{{ search }}">
+                    </div>
+                </div>
+
+                <!-- Event Filter -->
+                <div class="filter-group">
+                    <label class="filter-label">Event Category</label>
+                    <select name="event" class="form-control" onchange="this.form.submit()">
+                        <option value="all" {% if event_filter == 'all' %}selected{% endif %}>All Events</option>
+                        <option value="No Helmet Detected" {% if event_filter == 'No Helmet Detected' %}selected{% endif %}>No Helmet Detected</option>
+                        <option value="Helmet Detected" {% if event_filter == 'Helmet Detected' %}selected{% endif %}>Helmet Detected</option>
+                        <option value="Motorcycle Monitored (No Helmet Model Installed)" {% if event_filter == 'Motorcycle Monitored (No Helmet Model Installed)' %}selected{% endif %}>Motorcycle Monitored</option>
+                        <option value="Vehicle Detected - Car" {% if event_filter == 'Vehicle Detected - Car' %}selected{% endif %}>Car Detected</option>
+                        <option value="Vehicle Detected - Bus" {% if event_filter == 'Vehicle Detected - Bus' %}selected{% endif %}>Bus Detected</option>
+                        <option value="Vehicle Detected - Truck" {% if event_filter == 'Vehicle Detected - Truck' %}selected{% endif %}>Truck Detected</option>
+                    </select>
+                </div>
+
+                <!-- Review Status Filter -->
+                <div class="filter-group">
+                    <label class="filter-label">Review Status</label>
+                    <select name="status" class="form-control" onchange="this.form.submit()">
+                        <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All Statuses</option>
+                        <option value="Pending Review" {% if status_filter == 'Pending Review' %}selected{% endif %}>Pending Review</option>
+                        <option value="Approved Violation" {% if status_filter == 'Approved Violation' %}selected{% endif %}>Approved Violation</option>
+                        <option value="Dismissed / False Positive" {% if status_filter == 'Dismissed / False Positive' %}selected{% endif %}>Dismissed / False Positive</option>
+                    </select>
+                </div>
+
+                <!-- Vehicle Type Filter -->
+                <div class="filter-group">
+                    <label class="filter-label">Vehicle Type</label>
+                    <select name="vehicle" class="form-control" onchange="this.form.submit()">
+                        <option value="all" {% if vehicle_filter == 'all' %}selected{% endif %}>All Vehicles</option>
+                        <option value="car" {% if vehicle_filter == 'car' %}selected{% endif %}>Car</option>
+                        <option value="motorcycle" {% if vehicle_filter == 'motorcycle' %}selected{% endif %}>Motorcycle</option>
+                        <option value="bus" {% if vehicle_filter == 'bus' %}selected{% endif %}>Bus</option>
+                        <option value="truck" {% if vehicle_filter == 'truck' %}selected{% endif %}>Truck</option>
+                    </select>
+                </div>
+
+                <!-- Source Video Filter -->
+                <div class="filter-group">
+                    <label class="filter-label">Video Source</label>
+                    <select name="video_id" class="form-control" onchange="this.form.submit()">
+                        <option value="">All Videos</option>
+                        {% for v in all_videos %}
+                            <option value="{{ v.id }}" {% if selected_video_id == v.id %}selected{% endif %}>{{ v.original_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Filter Actions -->
+                <div class="filter-group filter-actions">
+                    <label class="filter-label">&nbsp;</label>
+                    <div class="btn-group">
+                        <button type="submit" class="btn btn-primary">Filter</button>
+                        {% if search or event_filter != 'all' or status_filter != 'all' or vehicle_filter != 'all' or selected_video_id %}
+                            <a href="{{ url_for('records_view') }}" class="btn btn-outline" title="Clear All Filters">Reset</a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Active Filters & Summary Bar -->
+    <div class="results-meta-bar">
+        <span>Found <strong>{{ total_records }}</strong> total matching records</span>
+        <span class="text-muted text-xs">Showing page {{ page }} of {{ total_pages }}</span>
+    </div>
+
+    <!-- Records Table -->
+    <div class="section-card mt-3">
+        {% if records %}
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Evidence Preview</th>
+                            <th>ID</th>
+                            <th>Video Source</th>
+                            <th>Timestamp</th>
+                            <th>Vehicle Type</th>
+                            <th>License Plate</th>
+                            <th>Detected Event</th>
+                            <th>Confidence</th>
+                            <th>Review Status</th>
+                            <th>Auditor Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for r in records %}
+                            <tr id="row-{{ r.id }}">
+                                <td>
+                                    <div class="evidence-thumb-wrap" onclick="openEvidenceModal(
+                                        '{{ url_for('static', filename='evidence/' + r.evidence_image) }}',
+                                        'Record #{{ r.id }} - {{ r.event_type }}',
+                                        '{{ r.formatted_time }}',
+                                        '{{ r.event_type }}',
+                                        '{{ r.vehicle_type }}',
+                                        '{{ r.plate_text }}',
+                                        '{{ (r.confidence * 100) | round(1) }}%',
+                                        '{{ r.review_status }}',
+                                        '{{ r.reviewer_notes | default('No notes', true) }}'
+                                    )">
+                                        <img src="{{ url_for('static', filename='evidence/' + r.evidence_image) }}" 
+                                             alt="Evidence frame" 
+                                             class="evidence-thumb"
+                                             onerror="this.src='https://placehold.co/120x80?text=Preview';">
+                                        <div class="thumb-overlay">
+                                            <i class="fa-solid fa-magnifying-glass-plus"></i>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="font-mono text-muted text-xs">#{{ r.id }}</span>
+                                </td>
+                                <td>
+                                    <span class="font-medium text-slate-800 text-sm" title="{{ r.video_name }}">
+                                        {{ r.video_name }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="font-mono badge-time">{{ r.formatted_time }}</span>
+                                </td>
+                                <td>
+                                    <span class="vehicle-badge vehicle-{{ r.vehicle_type }}">
+                                        {{ r.vehicle_type | capitalize }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="plate-badge">{{ r.plate_text }}</span>
+                                </td>
+                                <td>
+                                    <span class="event-tag {% if 'Violation' in r.event_type or 'No Helmet' in r.event_type %}event-violation{% else %}event-normal{% endif %}">
+                                        {{ r.event_type }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="conf-pill">{{ (r.confidence * 100) | round(1) }}%</span>
+                                </td>
+                                <td>
+                                    <span id="status-badge-{{ r.id }}" class="review-status-pill status-{{ r.review_status | lower | replace(' ', '-') | replace('/', '-') }}">
+                                        {{ r.review_status }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="action-btn-group">
+                                        <button class="btn btn-xs btn-outline" 
+                                                title="Detailed Review"
+                                                onclick="openReviewModal('{{ r.id }}', '{{ r.review_status }}', '{{ r.reviewer_notes | escape }}')">
+                                            <i class="fa-solid fa-user-pen"></i> Review
+                                        </button>
+                                        <button class="btn btn-xs btn-outline-success" 
+                                                title="Quick Approve Violation"
+                                                onclick="quickUpdateReview({{ r.id }}, 'Approved Violation')">
+                                            <i class="fa-solid fa-check"></i>
+                                        </button>
+                                        <button class="btn btn-xs btn-outline-danger" 
+                                                title="Quick Dismiss / False Positive"
+                                                onclick="quickUpdateReview({{ r.id }}, 'Dismissed / False Positive')">
+                                            <i class="fa-solid fa-xmark"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination Bar -->
+            {% if total_pages > 1 %}
+                <div class="pagination-container">
+                    <div class="pagination-info">
+                        Showing page {{ page }} of {{ total_pages }}
+                    </div>
+                    <div class="pagination-links">
+                        {% if page > 1 %}
+                            <a href="{{ url_for('records_view', page=page-1, search=search, event=event_filter, status=status_filter, vehicle=vehicle_filter, video_id=selected_video_id) }}" class="btn btn-sm btn-outline">
+                                &laquo; Previous
+                            </a>
+                        {% endif %}
+                        
+                        <span class="pagination-current font-bold">{{ page }}</span>
+
+                        {% if page < total_pages %}
+                            <a href="{{ url_for('records_view', page=page+1, search=search, event=event_filter, status=status_filter, vehicle=vehicle_filter, video_id=selected_video_id) }}" class="btn btn-sm btn-outline">
+                                Next &raquo;
+                            </a>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endif %}
+
+        {% else %}
+            <div class="empty-state">
+                <i class="fa-solid fa-filter-circle-xmark empty-icon"></i>
+                <h3>No Matching Records Found</h3>
+                <p>Try broadening your filter criteria, removing search terms, or uploading new traffic videos.</p>
+                <a href="{{ url_for('records_view') }}" class="btn btn-outline mt-3">Reset All Filters</a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

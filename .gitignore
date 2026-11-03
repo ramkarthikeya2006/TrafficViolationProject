@@ -1,0 +1,28 @@
+# Virtual Environment
+venv/
+env/
+.env
+
+# Python bytecode & caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Media Uploads & Evidence Data (avoid committing large video / run outputs)
+uploads/*
+!uploads/.gitkeep
+static/evidence/*
+!static/evidence/.gitkeep
+
+# SQLite database
+traffic_system.db
+*.db
+*.sqlite3
+
+# OS / Editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.log
